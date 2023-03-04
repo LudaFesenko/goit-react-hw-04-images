@@ -4,6 +4,10 @@ import ImageGalleryItem from 'components/ImageGalleryItem';
 import { ImageList } from './ImageGallery.styled';
 
 const ImageGallery = ({ images, onClickImg }) => {
+  if (!images.length) {
+    return null;
+  }
+
   return (
     <ImageList>
       {images.map(({ id, tags, webformatURL, largeImageURL }) => (

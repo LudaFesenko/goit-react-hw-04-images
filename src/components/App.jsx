@@ -121,8 +121,11 @@ export class App extends Component {
           pauseOnHover
           theme="colored"
         />
+
         {status === 'loading' && <Loader />}
-        {canLoadMore && <Button onClick={this.loadNextPage} />}
+        {canLoadMore && status !== 'loading' && (
+          <Button onClick={this.loadNextPage} />
+        )}
       </Container>
     );
   }

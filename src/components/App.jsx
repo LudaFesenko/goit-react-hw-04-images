@@ -1,6 +1,6 @@
 import 'react-toastify/dist/ReactToastify.css';
 
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import { toast, ToastContainer } from 'react-toastify';
 
 import { fetchImages, PER_PAGE } from '../api';
@@ -11,122 +11,106 @@ import Loader from './Loader';
 import Modal from './Modal';
 import Button from './Button';
 
-export class App extends Component {
-  state = {
-    status: 'idle',
-    searchString: '',
-    page: 1,
-    images: [],
-    canLoadMore: false,
+export const App = () => {
+  const [status, setStatus] = useState('idle');
+  const [searchString, setSearchString] = useState('');
+  const [page, setPage] = useState(1);
+  const [images, setImages] = useState([]);
+  const [canLoadMore, setCanLoadMore] = useState(false);
 
-    showModal: false,
-    modalAlt: '',
-    modalImg: '',
-  };
+  const [showModal, setShowModal] = useState(false);
+  const [modalAlt, setModalAlt] = useState('');
+  const [modalImg, setModalImg] = useState('');
 
-  componentDidUpdate(_, prevState) {
-    if (
-      this.state.searchString !== prevState.searchString ||
-      this.state.page !== prevState.page
-    ) {
-      this.loadImages();
-    }
-  }
-
-  setNewSearch = searchString => {
-    this.setState({
-      searchString,
-      page: 1,
-      images: [],
-      canLoadMore: false,
-    });
-  };
-
-  loadImages = async () => {
-    if (this.state.status === 'loading') {
-      return;
-    }
-
-    const { searchString, page, images } = this.state;
-
-    try {
-      this.setState({ status: 'loading' });
-
-      const response = await fetchImages(searchString, page);
-
-      if (!response.hits.length) {
-        toast.error(
-          'Sorry, there are no images matching your search query. Please try again.'
-        );
-
-        this.setState({ images: [], canLoadMore: false });
+  useEffect(() => {
+    const loadImages = async () => {
+      if (!searchString) {
         return;
       }
 
-      if (page === 1) {
-        toast.info(`Hooray! We found ${response.totalHits} images`);
+      try {
+        setStatus('loading');
+
+        const response = await fetchImages(searchString, page);
+
+        if (!response.hits.length) {
+          toast.error(
+            'Sorry, there are no images matching your search query. Please try again.'
+          );
+          setImages([]);
+          setCanLoadMore(false);
+
+          return;
+        }
+
+        if (page === 1) {
+          toast.info(`Hooray! We found ${response.totalHits} images`);
+        }
+
+        const maxPage = response.totalHits / PER_PAGE;
+
+        setImages(prevState => [...prevState, ...response.hits]);
+
+        setCanLoadMore(page < maxPage);
+      } catch (error) {
+        setStatus('error');
+      } finally {
+        setStatus('idle');
       }
+    };
 
-      const maxPage = response.totalHits / PER_PAGE;
+    loadImages();
+  }, [searchString, page]);
 
-      this.setState({
-        images: [...images, ...response.hits],
-        canLoadMore: page < maxPage,
-      });
-    } catch (error) {
-      this.setState({ status: 'error' });
-    } finally {
-      this.setState({ status: 'idle' });
+  const setNewSearch = query => {
+    if (status === 'loading') {
+      return;
     }
+
+    setSearchString(query);
+    setPage(1);
+    setImages([]);
+    setCanLoadMore(false);
   };
 
-  handleClickImg = ({ target: { alt, dataset } }) => {
-    this.setState({
-      showModal: true,
-      modalImg: dataset.src,
-      modalAlt: alt,
-    });
+  const handleClickImg = ({ target: { alt, dataset } }) => {
+    setShowModal(true);
+    setModalImg(dataset.src);
+    setModalAlt(alt);
   };
 
-  toggleModal = () => {
-    this.setState(({ showModal }) => ({ showModal: !showModal }));
+  const toggleModal = () => {
+    setShowModal(prevState => !prevState);
   };
 
-  loadNextPage = () => {
-    this.setState(({ page }) => ({ page: page + 1 }));
+  const loadNextPage = () => {
+    setPage(prevState => prevState + 1);
   };
 
-  render() {
-    const { images, status, canLoadMore, showModal, modalImg, modalAlt } =
-      this.state;
+  return (
+    <Container>
+      {showModal && (
+        <Modal onClose={toggleModal}>
+          <img src={modalImg} alt={modalAlt} />
+        </Modal>
+      )}
+      <Searchbar onSubmit={setNewSearch} />
+      <ImageGallery images={images} onClickImg={handleClickImg} />
+      <ToastContainer
+        position="top-right"
+        autoClose={1000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
 
-    return (
-      <Container>
-        {showModal && (
-          <Modal onClose={this.toggleModal}>
-            <img src={modalImg} alt={modalAlt} />
-          </Modal>
-        )}
-        <Searchbar onSubmit={this.setNewSearch} />
-        <ImageGallery images={images} onClickImg={this.handleClickImg} />
-        <ToastContainer
-          position="top-right"
-          autoClose={1000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="colored"
-        />
-
-        {status === 'loading' && <Loader />}
-        {canLoadMore && status !== 'loading' && (
-          <Button onClick={this.loadNextPage} />
-        )}
-      </Container>
-    );
-  }
-}
+      {status === 'loading' && <Loader />}
+      {canLoadMore && status !== 'loading' && <Button onClick={loadNextPage} />}
+    </Container>
+  );
+};
